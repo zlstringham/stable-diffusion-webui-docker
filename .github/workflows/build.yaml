@@ -68,13 +68,8 @@ jobs:
           - target: full
             suffix:
     steps:
-      # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
       - name: Free up disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+        uses: jlumbroso/free-disk-space@main
       - name: Docker metadata
         id: docker_meta
         uses: docker/metadata-action@v5
@@ -121,13 +116,8 @@ jobs:
           - target: full
             suffix:
     steps:
-      # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
       - name: Free up disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+        uses: jlumbroso/free-disk-space@main
       - name: Docker metadata
         id: docker_meta
         uses: docker/metadata-action@v5
