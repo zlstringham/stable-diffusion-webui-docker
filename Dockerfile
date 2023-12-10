@@ -57,10 +57,19 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked,id=apt-${TARGETPLATF
         yasm
     rm -rf /var/lib/apt/lists/*
 
-    # Install ffmpeg from source
-    # https://docs.nvidia.com/video-technologies/video-codec-sdk/12.1/ffmpeg-with-nvidia-gpu/index.html
+    groupadd -g 1000 webui
+    useradd -d /app -u 1000 -g webui webui
+    chown -R webui:webui /app
+EOT
+
+
+# Install ffmpeg from source. This takes a while so it's separated from the cache mutexes.
+# https://docs.nvidia.com/video-technologies/video-codec-sdk/12.1/ffmpeg-with-nvidia-gpu/index.html
+RUN <<EOT
+    set -ex
     git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git
     cd nv-codec-headers && make install && cd -
+
     git clone https://git.ffmpeg.org/ffmpeg.git
     cd ffmpeg
     ./configure --enable-nonfree --enable-cuda-nvcc --enable-libnpp \
@@ -68,11 +77,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked,id=apt-${TARGETPLATF
         --disable-static --enable-shared
     make -j$(nproc) && make install && cd -
     rm -rf nv-codec-headers ffmpeg
-
-    groupadd -g 1000 webui
-    useradd -d /app -u 1000 -g webui webui
-    chown -R webui:webui /app
-EOT
+>>
 
 USER webui:webui
 ENV PATH="/app/.local/bin:${PATH}"
