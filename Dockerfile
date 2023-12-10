@@ -118,7 +118,7 @@ RUN --mount=type=cache,uid=1000,gid=1000,target=/app/.cache/pip,sharing=locked,i
     [ -z "${TORCH_COMMAND}" ] && unset TORCH_COMMAND
 
     cd stable-diffusion-webui
-    venv_dir=- ./webui.sh --skip-torch-cuda-test --exit
+    venv_dir=- ./webui.sh --skip-torch-cuda-test --xformers --exit
 
     mv repositories/ ../repositories/
     mkdir -p repositories

@@ -62,6 +62,11 @@ jobs:
       max-parallel: 1
       matrix:
         platform: [linux/amd64, linux/arm64]
+        include:
+          - target: base
+            suffix: "-base"
+          - target: full
+            suffix:
     steps:
       # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
       - name: Free up disk space
@@ -76,8 +81,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=sha-${{ needs.check_tag.outputs.sha }}
-            type=raw,value=${{ needs.check_tag.outputs.tag }}
+            type=raw,value=sha-${{ needs.check_tag.outputs.sha }}${{ matrix.suffix }}
+            type=raw,value=${{ needs.check_tag.outputs.tag }}${{ matrix.suffix }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -92,6 +97,7 @@ jobs:
         with:
           push: true
           platforms: ${{ matrix.platform }}
+          target: ${{ matrix.target }}
           build-args: |
             GIT_CLONE_CACHE=${{ needs.check_tag.outputs.sha }}
             GIT_BRANCH=${{ needs.check_tag.outputs.tag }}
@@ -109,6 +115,11 @@ jobs:
       max-parallel: 1
       matrix:
         platform: [linux/amd64, linux/arm64]
+        include:
+          - target: base
+            suffix: "-base"
+          - target: full
+            suffix:
     steps:
       # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
       - name: Free up disk space
@@ -123,9 +134,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=schedule,pattern=nightly-{{date 'YYYYMMDD'}}
-            type=raw,value=sha-${{ needs.check_dev.outputs.sha }}
-            type=raw,value=latest
+            type=schedule,pattern=nightly-{{date 'YYYYMMDD'}}${{ matrix.suffix }}
+            type=raw,value=sha-${{ needs.check_dev.outputs.sha }}${{ matrix.suffix }}}
+            type=raw,value=latest${{ matrix.suffix }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -140,6 +151,7 @@ jobs:
         with:
           push: true
           platforms: ${{ matrix.platform }}
+          target: ${{ matrix.target }}
           build-args: |
             GIT_CLONE_CACHE=${{ needs.check_dev.outputs.sha }}
             GIT_BRANCH=dev
