@@ -104,7 +104,7 @@ jobs:
   build_dev:
     runs-on: ubuntu-latest
     # Try to reduce errors from runner out of space by 1 build job at a time.
-    needs: [check_dev, build_tag]
+    needs: check_dev
     if: ${{ needs.check_dev.outputs.outcome == 'failure' }}
     strategy:
       max-parallel: 1
