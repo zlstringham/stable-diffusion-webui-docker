@@ -10,6 +10,7 @@
 **/.classpath
 **/.dockerignore
 **/.env
+**/.env.example
 **/.git
 **/.gitignore
 **/.project
@@ -30,5 +31,6 @@
 **/obj
 **/secrets.dev.yaml
 **/values.dev.yaml
-LICENSE
+/services/**/*
+LICENSE*
 README.md

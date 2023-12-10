@@ -1,62 +1,120 @@
-# syntax=docker/dockerfile:1
+FROM nvidia/cuda:11.8.0-devel-ubuntu22.04 AS base
 
-# Comments are provided throughout this file to help you get started.
-# If you need more help, visit the Dockerfile reference guide at
-# https://docs.docker.com/engine/reference/builder/
+ENV CUDA_HOME=/usr/local/cuda
 
-################################################################################
-# Pick a base image to serve as the foundation for the other build stages in
-# this file.
-#
-# For illustrative purposes, the following FROM command
-# is using the alpine image (see https://hub.docker.com/_/alpine).
-# By specifying the "latest" tag, it will also use whatever happens to be the
-# most recent version of that image when you build your Dockerfile.
-# If reproducability is important, consider using a versioned tag
-# (e.g., alpine:3.17.2) or SHA (e.g., alpine@sha256:c41ab5c992deb4fe7e5da09f67a8804a46bd0592bfdf0b1847dde0e0889d2bff).
-FROM alpine:latest as base
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-################################################################################
-# Create a stage for building/compiling the application.
-#
-# The following commands will leverage the "base" stage above to generate
-# a "hello world" script and make it executable, but for a real application, you
-# would issue a RUN command for your application's build process to generate the
-# executable. For language-specific examples, take a look at the Dockerfiles in
-# the Awesome Compose repository: https://github.com/docker/awesome-compose
-FROM base as build
-COPY <<EOF /bin/hello.sh
-#!/bin/sh
-echo Hello world from $(whoami)! In order to get your application running in a container, take a look at the comments in the Dockerfile to get started.
-EOF
-RUN chmod +x /bin/hello.sh
+WORKDIR /app
 
-################################################################################
-# Create a final stage for running your application.
-#
-# The following commands copy the output from the "build" stage above and tell
-# the container runtime to execute it when the image is run. Ideally this stage
-# contains the minimal runtime dependencies for the application as to produce
-# the smallest image possible. This often means using a different and smaller
-# image than the one used for building the application, but for illustrative
-# purposes the "base" image is used here.
-FROM base AS final
+# https://github.com/moby/buildkit/blob/master/frontend/dockerfile/docs/reference.md#example-cache-apt-packages
+RUN rm -f /etc/apt/apt.conf.d/docker-clean && \
+    echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
-# Create a non-privileged user that the app will run under.
-# See https://docs.docker.com/go/dockerfile-user-best-practices/
-ARG UID=10001
-RUN adduser \
-    --disabled-password \
-    --gecos "" \
-    --home "/nonexistent" \
-    --shell "/sbin/nologin" \
-    --no-create-home \
-    --uid "${UID}" \
-    appuser
-USER appuser
+ARG NODE_MAJOR=21
+ARG TARGETPLATFORM
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked,id=apt-${TARGETPLATFORM} <<EOT
+    set -ex
 
-# Copy the executable from the "build" stage.
-COPY --from=build /bin/hello.sh /bin/
+    # nodejs pre-install step. See:
+    # https://nodejs.org/en/download/package-manager#debian-and-ubuntu-based-linux-distributions
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends install -y \
+        ca-certificates \
+        curl \
+        gnupg
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+        | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" \
+        | tee /etc/apt/sources.list.d/nodesource.list
 
-# What the container should run when it is started.
-ENTRYPOINT [ "/bin/hello.sh" ]
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends install -y \
+        build-essential \
+        ffmpeg \
+        git \
+        libgl1 \
+        libglib2.0-0 \
+        libtcmalloc-minimal4 \
+        nodejs \
+        python3 \
+        python3-dev \
+        python3-opencv \
+        python3-packaging \
+        python3-pip \
+        python3-venv \
+        wget
+    rm -rf /var/lib/apt/lists/*
+
+    groupadd -g 1000 webui
+    useradd -d /app -u 1000 -g webui webui
+    chown -R webui:webui /app
+EOT
+
+USER webui:webui
+ENV PATH="/app/.local/bin:${PATH}"
+
+# Arg to invalidate cached git clone step
+ARG GIT_CLONE_CACHE
+RUN <<EOT
+    set -ex
+    git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui.git
+
+    cd stable-diffusion-webui
+    mkdir -p config-states
+    mkdir -p embeddings
+    mkdir -p extensions
+    mkdir -p interrogate
+    mkdir -p log
+    mkdir -p models
+    mkdir -p node_modules
+    mkdir -p repositories
+    mkdir -p outputs
+    mkdir -p venv
+EOT
+
+VOLUME /app/stable-diffusion-webui/config-states
+VOLUME /app/stable-diffusion-webui/embeddings
+VOLUME /app/stable-diffusion-webui/extensions
+VOLUME /app/stable-diffusion-webui/interrogate
+VOLUME /app/stable-diffusion-webui/log
+VOLUME /app/stable-diffusion-webui/models
+VOLUME /app/stable-diffusion-webui/node_modules
+VOLUME /app/stable-diffusion-webui/repositories
+VOLUME /app/stable-diffusion-webui/outputs
+VOLUME /app/stable-diffusion-webui/venv
+
+COPY --chmod=775 --chown=webui:webui ./entrypoint.sh .
+
+ARG PORT=7860
+ENV PORT=${PORT}
+EXPOSE ${PORT}
+
+ENTRYPOINT ["./entrypoint.sh"]
+
+FROM base AS full
+
+ARG BLIP_COMMIT_HASH
+ARG CODEFORMER_COMMIT_HASH
+ARG GFPGAN_PACKAGE
+ARG K_DIFFUSION_PACKAGE
+ARG STABLE_DIFFUSION_COMMIT_HASH
+ARG TORCH_COMMAND
+RUN --mount=type=cache,uid=1000,gid=1000,target=/app/.cache/pip,sharing=locked,id=pip-${TARGETPLATFORM} <<EOT
+    set -ex
+
+    # Having these set to empty string prevents webui from loading defaults.
+    [ -z "${BLIP_COMMIT_HASH}" ] && unset BLIP_COMMIT_HASH
+    [ -z "${CODEFORMER_COMMIT_HASH}" ] && unset CODEFORMER_COMMIT_HASH
+    [ -z "${GFPGAN_PACKAGE}" ] && unset GFPGAN_PACKAGE
+    [ -z "${K_DIFFUSION_PACKAGE}" ] && unset K_DIFFUSION_PACKAGE
+    [ -z "${STABLE_DIFFUSION_COMMIT_HASH}" ]  && unset STABLE_DIFFUSION_COMMIT_HASH
+    [ -z "${TORCH_COMMAND}" ] && unset TORCH_COMMAND
+
+    cd stable-diffusion-webui
+    venv_dir=- ./webui.sh --skip-torch-cuda-test --exit
+
+    mv repositories/ ../repositories/
+    mkdir -p repositories
+EOT
