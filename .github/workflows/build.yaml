@@ -61,7 +61,6 @@ jobs:
     strategy:
       max-parallel: 1
       matrix:
-        platform: [linux/amd64, linux/arm64]
         target: [base, full]
         include:
           - target: base
@@ -97,7 +96,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           push: true
-          platforms: ${{ matrix.platform }}
+          platforms: [linux/amd64, linux/arm64]
           target: ${{ matrix.target }}
           build-args: |
             GIT_CLONE_CACHE=${{ needs.check_tag.outputs.sha }}
@@ -115,7 +114,6 @@ jobs:
     strategy:
       max-parallel: 1
       matrix:
-        platform: [linux/amd64, linux/arm64]
         target: [base, full]
         include:
           - target: base
@@ -152,7 +150,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           push: true
-          platforms: ${{ matrix.platform }}
+          platforms: [linux/amd64, linux/arm64]
           target: ${{ matrix.target }}
           build-args: |
             GIT_CLONE_CACHE=${{ needs.check_dev.outputs.sha }}
