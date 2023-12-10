@@ -125,7 +125,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=schedule,pattern=nightly-{{date 'YYYYMMDD'}}${{ matrix.suffix }}
-            type=raw,value=sha-${{ needs.check_dev.outputs.sha }}${{ matrix.suffix }}}
+            type=raw,value=sha-${{ needs.check_dev.outputs.sha }}${{ matrix.suffix }}
             type=raw,value=latest${{ matrix.suffix }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
