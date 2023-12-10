@@ -1,0 +1,126 @@
+name: Docker
+
+on:
+  schedule:
+    - cron: '15 8 * * *'
+  workflow_dispatch:
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: zlstringham/stable-diffusion-webui
+
+jobs:
+  check_dev:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.meta.outputs.sha }}
+      exists: ${{ steps.exists.outcome == 'success' }}
+    steps:
+      - name: Dev Metadata
+        id: meta
+        run: |
+          echo "sha=$(git ls-remote --heads https://github.com/AUTOMATIC1111/stable-diffusion-webui.git | grep refs/heads/dev | head -c7)" >> "$GITHUB_OUTPUT"
+      - name: Check if image for latest dev commit exists
+        id: exists
+        uses: cloudposse/github-action-docker-image-exists@main
+        continue-on-error: true
+        with:
+          registry: registry.hub.docker.com
+          image_name: "${{ env.IMAGE_NAME }}"
+          tag: sha-${{ steps.meta.outputs.sha }}
+          login: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  check_tag:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.meta.outputs.sha }}
+      tag: ${{ steps.meta.outputs.tag }}
+      exists: ${{ steps.exists.outcome == 'success' }}
+    steps:
+      - name: Tag Metadata
+        id: meta
+        run: |
+          echo "sha=$(git ls-remote --tags --sort="v:refname" https://github.com/AUTOMATIC1111/stable-diffusion-webui.git | tail --lines=1 | head -c7)" >> "$GITHUB_OUTPUT"
+          echo "tag=${$(git ls-remote --tags --sort="v:refname" https://github.com/AUTOMATIC1111/stable-diffusion-webui.git | tail --lines=1 | cut --delimiter='/' --fields=3)%^{}}" >> "$GITHUB_OUTPUT"
+      - name: Check if image for latest tag exists
+        id: exists
+        uses: cloudposse/github-action-docker-image-exists@main
+        continue-on-error: true
+        with:
+          registry: registry.hub.docker.com
+          image_name: "${{ env.IMAGE_NAME }}"
+          tag: ${{ steps.meta.outputs.tag }}
+          login: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  build_dev:
+    runs-on: ubuntu-latest
+    needs: check_dev
+    if: ${{ ! needs.check_dev.outputs.exists }}
+    steps:
+      - name: Docker metadata
+        id: docker_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=schedule,pattern=nightly-{{date 'YYYYMMDD'}}
+            type=raw,value=sha-${{ needs.check_dev.outputs.sha }}
+            type=raw,value=latest
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            GIT_CLONE_CACHE=${{ needs.check_dev.outputs.sha }}
+            GIT_BRANCH=dev
+          labels: ${{ steps.docker_meta.outputs.labels }}
+          tags: ${{ steps.docker_meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build_tag:
+    runs-on: ubuntu-latest
+    needs: check_tag
+    if: ${{ ! needs.check_tag.outputs.exists }}
+    steps:
+      - name: Docker metadata
+        id: docker_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=sha-${{ needs.check_tag.outputs.sha }}
+            type=raw,value=${{ needs.check_tag.outputs.tag }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            GIT_CLONE_CACHE=${{ needs.check_tag.outputs.sha }}
+            GIT_BRANCH=${{ needs.check_tag.outputs.tag }}
+          labels: ${{ steps.docker_meta.outputs.labels }}
+          tags: ${{ steps.docker_meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -55,11 +55,13 @@ EOT
 USER webui:webui
 ENV PATH="/app/.local/bin:${PATH}"
 
+ARG GIT_BRANCH=master
 # Arg to invalidate cached git clone step
 ARG GIT_CLONE_CACHE
 RUN <<EOT
     set -ex
-    git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui.git
+    git clone -b ${GIT_BRANCH} --depth 1 \
+        https://github.com/AUTOMATIC1111/stable-diffusion-webui.git
 
     cd stable-diffusion-webui
     mkdir -p config-states
