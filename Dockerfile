@@ -34,9 +34,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked,id=apt-${TARGETPLATF
         build-essential \
         ffmpeg \
         git \
-        libgl1 \
+        libgl1-mesa-dev \
         libglib2.0-0 \
+        libsm6 \
         libtcmalloc-minimal4 \
+        libxrender1 \
+        libxext6 \
         nodejs \
         python3 \
         python3-dev \
