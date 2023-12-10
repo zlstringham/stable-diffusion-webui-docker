@@ -32,23 +32,42 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked,id=apt-${TARGETPLATF
     apt-get update
     DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends install -y \
         build-essential \
-        ffmpeg \
+        cmake \
+        curl \
         git \
+        libc6 \
+        libc6-dev \
         libgl1-mesa-dev \
         libglib2.0-0 \
+        libnuma1 \
+        libnuma-dev \
         libsm6 \
         libtcmalloc-minimal4 \
-        libxrender1 \
+        libtool \
         libxext6 \
+        libxrender1 \
         nodejs \
+        pkg-config \
         python3 \
         python3-dev \
-        python3-opencv \
         python3-packaging \
         python3-pip \
         python3-venv \
-        wget
+        wget \
+        yasm
     rm -rf /var/lib/apt/lists/*
+
+    # Install ffmpeg from source
+    # https://docs.nvidia.com/video-technologies/video-codec-sdk/12.1/ffmpeg-with-nvidia-gpu/index.html
+    git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git
+    cd nv-codec-headers && make install && cd -
+    git clone https://git.ffmpeg.org/ffmpeg.git
+    cd ffmpeg
+    ./configure --enable-nonfree --enable-cuda-nvcc --enable-libnpp \
+        --extra-cflags=-I/usr/local/cuda/include --extra-ldflags=-L/usr/local/cuda/lib64 \
+        --disable-static --enable-shared
+    make -j$(nproc) && make install && cd -
+    rm -rf nv-codec-headers ffmpeg
 
     groupadd -g 1000 webui
     useradd -d /app -u 1000 -g webui webui
