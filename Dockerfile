@@ -33,7 +33,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked,id=apt-${TARGETPLATF
     DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends install -y \
         build-essential \
         cmake \
-        curl \
         git \
         libc6 \
         libc6-dev \
