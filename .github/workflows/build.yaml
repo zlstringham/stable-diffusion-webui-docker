@@ -32,6 +32,28 @@ jobs:
           login: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+  check_master:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.meta.outputs.sha }}
+      outcome: ${{ steps.exists.outcome }}
+    steps:
+      - name: Master Metadata
+        id: meta
+        run: |
+          echo "sha=$(git ls-remote --heads https://github.com/AUTOMATIC1111/stable-diffusion-webui.git | grep refs/heads/master | head -c7)" >> "$GITHUB_OUTPUT"
+      - name: Check if image for latest master commit exists
+        id: exists
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        uses: cloudposse/github-action-docker-image-exists@main
+        continue-on-error: true
+        with:
+          registry: registry.hub.docker.com
+          image_name: "${{ env.IMAGE_NAME }}"
+          tag: sha-${{ steps.meta.outputs.sha }}
+          login: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
   check_tag:
     runs-on: ubuntu-latest
     outputs:
@@ -55,6 +77,102 @@ jobs:
           tag: ${{ steps.meta.outputs.tag }}
           login: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  build_dev:
+    runs-on: ubuntu-latest
+    needs: check_dev
+    if: ${{ github.event_name == 'workflow_dispatch' || needs.check_dev.outputs.outcome == 'failure' }}
+    strategy:
+      max-parallel: 1
+      matrix:
+        target: [base, full]
+        include:
+          - target: base
+            suffix: "-base"
+          - target: full
+            suffix:
+    steps:
+      - name: Free up disk space
+        uses: jlumbroso/free-disk-space@main
+      - name: Docker metadata
+        id: docker_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=schedule,pattern=nightly-{{date 'YYYYMMDD'}}${{ matrix.suffix }}
+            type=schedule,pattern=nightly${{ matrix.suffix }}
+            type=raw,value=sha-${{ needs.check_dev.outputs.sha }}${{ matrix.suffix }}
+            type=raw,value=dev${{ matrix.suffix }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          platforms: linux/amd64,linux/arm64
+          target: ${{ matrix.target }}
+          build-args: |
+            GIT_CLONE_CACHE=${{ needs.check_dev.outputs.sha }}
+            GIT_BRANCH=dev
+          labels: ${{ steps.docker_meta.outputs.labels }}
+          tags: ${{ steps.docker_meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build_master:
+    runs-on: ubuntu-latest
+    needs: check_master
+    if: ${{ github.event_name == 'workflow_dispatch' || needs.check_master.outputs.outcome == 'failure' }}
+    strategy:
+      max-parallel: 1
+      matrix:
+        target: [base, full]
+        include:
+          - target: base
+            suffix: "-base"
+          - target: full
+            suffix:
+    steps:
+      - name: Free up disk space
+        uses: jlumbroso/free-disk-space@main
+      - name: Docker metadata
+        id: docker_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=sha-${{ needs.check_master.outputs.sha }}${{ matrix.suffix }}
+            type=raw,value=latest${{ matrix.suffix }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          platforms: linux/amd64,linux/arm64
+          target: ${{ matrix.target }}
+          build-args: |
+            GIT_CLONE_CACHE=${{ needs.check_master.outputs.sha }}
+            GIT_BRANCH=master
+          labels: ${{ steps.docker_meta.outputs.labels }}
+          tags: ${{ steps.docker_meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   build_tag:
     runs-on: ubuntu-latest
@@ -98,55 +216,6 @@ jobs:
           build-args: |
             GIT_CLONE_CACHE=${{ needs.check_tag.outputs.sha }}
             GIT_BRANCH=${{ needs.check_tag.outputs.tag }}
-          labels: ${{ steps.docker_meta.outputs.labels }}
-          tags: ${{ steps.docker_meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  build_dev:
-    runs-on: ubuntu-latest
-    # Try to reduce errors from runner out of space by 1 build job at a time.
-    needs: check_dev
-    if: ${{ github.event_name == 'workflow_dispatch' || needs.check_dev.outputs.outcome == 'failure' }}
-    strategy:
-      max-parallel: 1
-      matrix:
-        target: [base, full]
-        include:
-          - target: base
-            suffix: "-base"
-          - target: full
-            suffix:
-    steps:
-      - name: Free up disk space
-        uses: jlumbroso/free-disk-space@main
-      - name: Docker metadata
-        id: docker_meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=schedule,pattern=nightly-{{date 'YYYYMMDD'}}${{ matrix.suffix }}
-            type=raw,value=sha-${{ needs.check_dev.outputs.sha }}${{ matrix.suffix }}
-            type=raw,value=latest${{ matrix.suffix }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          push: true
-          platforms: linux/amd64,linux/arm64
-          target: ${{ matrix.target }}
-          build-args: |
-            GIT_CLONE_CACHE=${{ needs.check_dev.outputs.sha }}
-            GIT_BRANCH=dev
           labels: ${{ steps.docker_meta.outputs.labels }}
           tags: ${{ steps.docker_meta.outputs.tags }}
           cache-from: type=gha
