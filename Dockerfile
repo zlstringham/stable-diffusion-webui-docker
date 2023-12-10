@@ -77,7 +77,7 @@ RUN <<EOT
         --disable-static --enable-shared
     make -j$(nproc) && make install && cd -
     rm -rf nv-codec-headers ffmpeg
->>
+EOT
 
 USER webui:webui
 ENV PATH="/app/.local/bin:${PATH}"
