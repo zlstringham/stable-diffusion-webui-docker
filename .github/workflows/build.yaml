@@ -100,8 +100,8 @@ jobs:
     runs-on: ubuntu-latest
     # Try to reduce errors from runner out of space by 1 build job at a time.
     needs: |
-      check_dev
-      build_tag
+      - check_dev
+      - build_tag
     if: ${{ needs.check_dev.outputs.outcome == 'failure' }}
     steps:
       # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
