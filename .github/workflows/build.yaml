@@ -42,7 +42,7 @@ jobs:
         id: meta
         run: |
           echo "sha=$(git ls-remote --tags --sort="v:refname" https://github.com/AUTOMATIC1111/stable-diffusion-webui.git | tail --lines=1 | head -c7)" >> "$GITHUB_OUTPUT"
-          echo "tag=${$(git ls-remote --tags --sort="v:refname" https://github.com/AUTOMATIC1111/stable-diffusion-webui.git | tail --lines=1 | cut --delimiter='/' --fields=3)%^{}}" >> "$GITHUB_OUTPUT"
+          echo "tag=$(git ls-remote --tags --sort="v:refname" https://github.com/AUTOMATIC1111/stable-diffusion-webui.git | grep -v '\^{}' | tail --lines=1 | cut --delimiter='/' --fields=3)" >> "$GITHUB_OUTPUT"
       - name: Check if image for latest tag exists
         id: exists
         uses: cloudposse/github-action-docker-image-exists@main
