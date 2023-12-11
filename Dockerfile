@@ -19,6 +19,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked <<EOT
     # https://nodejs.org/en/download/package-manager#debian-and-ubuntu-based-linux-distributions
     apt-get update
     DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends install -y \
+        apt-utils \
         ca-certificates \
         curl \
         gnupg
@@ -30,7 +31,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked <<EOT
 
     apt-get update
     DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends install -y \
-        apt-utils \
         build-essential \
         cmake \
         git \
