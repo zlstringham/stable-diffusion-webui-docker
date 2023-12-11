@@ -12,8 +12,7 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean && \
     echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
 ARG NODE_MAJOR=21
-ARG TARGETPLATFORM
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked,id=apt-${TARGETPLATFORM} <<EOT
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked <<EOT
     set -ex
 
     # nodejs pre-install step. See:
@@ -31,6 +30,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked,id=apt-${TARGETPLATF
 
     apt-get update
     DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends install -y \
+        apt-utils \
         build-essential \
         cmake \
         git \
@@ -123,15 +123,13 @@ ENTRYPOINT ["./entrypoint.sh"]
 
 FROM base AS full
 
-ARG TARGETPLATFORM
-
 ARG BLIP_COMMIT_HASH
 ARG CODEFORMER_COMMIT_HASH
 ARG GFPGAN_PACKAGE
 ARG K_DIFFUSION_PACKAGE
 ARG STABLE_DIFFUSION_COMMIT_HASH
 ARG TORCH_COMMAND
-RUN --mount=type=cache,uid=1000,gid=1000,target=/app/.cache/pip,sharing=locked,id=pip-${TARGETPLATFORM} <<EOT
+RUN --mount=type=cache,uid=1000,gid=1000,target=/app/.cache/pip,sharing=locked <<EOT
     set -ex
 
     # Having these set to empty string prevents webui from loading defaults.

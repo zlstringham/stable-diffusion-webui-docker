@@ -94,8 +94,6 @@ jobs:
             type=schedule,pattern=nightly${{ matrix.suffix }}
             type=raw,value=sha-${{ needs.check_dev.outputs.sha }}${{ matrix.suffix }}
             type=raw,value=dev${{ matrix.suffix }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to DockerHub
@@ -107,7 +105,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           target: ${{ matrix.target }}
           build-args: |
             GIT_CLONE_CACHE=${{ needs.check_dev.outputs.sha }}
@@ -140,8 +138,6 @@ jobs:
           tags: |
             type=raw,value=sha-${{ needs.check_master.outputs.sha }}${{ matrix.suffix }}
             type=raw,value=latest${{ matrix.suffix }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to DockerHub
@@ -153,7 +149,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           target: ${{ matrix.target }}
           build-args: |
             GIT_CLONE_CACHE=${{ needs.check_master.outputs.sha }}
@@ -187,8 +183,6 @@ jobs:
           tags: |
             type=raw,value=sha-${{ needs.check_tag.outputs.sha }}${{ matrix.suffix }}
             type=raw,value=${{ needs.check_tag.outputs.tag }}${{ matrix.suffix }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to DockerHub
@@ -200,7 +194,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           target: ${{ matrix.target }}
           build-args: |
             GIT_CLONE_CACHE=${{ needs.check_tag.outputs.sha }}
